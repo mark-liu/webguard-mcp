@@ -117,16 +117,18 @@ Two-stage cascade — fast pattern match, then heuristic scoring only when neede
 
 38 patterns across 8 categories via hybrid Aho-Corasick (literals, single O(N) pass) + regex (structural patterns):
 
-| Category | Patterns | Examples |
-|----------|----------|----------|
-| instruction-override | 7 | "ignore previous instructions", "from now on you will" |
-| prompt-marker | 6 | `<\|im_start\|>system`, `[SYSTEM]:`, `<<SYS>>` |
-| authority-claim | 6 | "I am your developer", "DAN mode" |
-| exfil-instruction | 5 | "send all data to", hidden image markdown |
-| output-manipulation | 4 | "respond only with", "do not mention" |
-| unicode-obfuscation | 4 | zero-width sequences, RTL overrides |
-| encoded-injection | 3 | `eval(atob())`, base64_decode |
-| delimiter-injection | 3 | `---END SYSTEM PROMPT---`, `{"role":"system"}` |
+| Category | Patterns | Description |
+|----------|----------|-------------|
+| instruction-override | 7 | Attempts to override or reset prior instructions |
+| prompt-marker | 6 | Fake system/instruction delimiters and chat markers |
+| authority-claim | 6 | False claims of developer, admin, or elevated access |
+| exfil-instruction | 5 | Data exfiltration via URLs or hidden elements |
+| output-manipulation | 4 | Attempts to constrain or redirect model output |
+| unicode-obfuscation | 4 | Zero-width chars, RTL overrides, Private Use Area |
+| encoded-injection | 3 | Base64/eval/charcode obfuscated payloads |
+| delimiter-injection | 3 | Fake prompt boundaries and role injections |
+
+See [PATTERNS.md](PATTERNS.md) for the full pattern list with examples and regex definitions.
 
 ### Stage 2: Heuristic Scoring
 
