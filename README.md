@@ -48,6 +48,15 @@ cd webguard-mcp
 make build
 ```
 
+### macOS Firewall
+
+macOS firewall blocks unsigned binaries from making network connections. If fetches time out, allow the binary through:
+
+```bash
+sudo /usr/libexec/ApplicationFirewall/socketfilterfw --add /path/to/webguard-mcp
+sudo /usr/libexec/ApplicationFirewall/socketfilterfw --unblockapp /path/to/webguard-mcp
+```
+
 ## Usage
 
 ```bash
