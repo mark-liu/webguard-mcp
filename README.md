@@ -39,6 +39,9 @@ LLM agents fetch web content that can contain prompt injection attacks. Existing
 ## Install
 
 ```bash
+# Homebrew (macOS/Linux)
+brew install mark-liu/tap/webguard-mcp
+
 # From source
 go install github.com/mark-liu/webguard-mcp/cmd/webguard-mcp@latest
 

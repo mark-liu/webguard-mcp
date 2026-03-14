@@ -1,5 +1,6 @@
 webguard-mcp
 benchmark
+dist/
 *.exe
 *.test
 *.out

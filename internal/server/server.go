@@ -3,8 +3,10 @@ package server
 import (
 	"context"
 	"fmt"
+	"log"
 	"net/url"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/mark3labs/mcp-go/mcp"
@@ -18,6 +20,7 @@ import (
 
 // Server wraps the MCP server with webguard classification and fetching.
 type Server struct {
+	mu      sync.RWMutex
 	config  *config.Config
 	audit   *audit.Logger
 	version string
@@ -46,6 +49,29 @@ func New(cfg *config.Config, auditLogger *audit.Logger, version string) *Server 
 // transport is closed or an error occurs.
 func (s *Server) Run() error {
 	return mcpserver.ServeStdio(s.mcp)
+}
+
+// ReloadConfig atomically swaps the server's config under a write lock.
+func (s *Server) ReloadConfig(cfg *config.Config) {
+	s.mu.Lock()
+	old := s.config
+	s.config = cfg
+	s.mu.Unlock()
+
+	log.Printf("config reloaded: sensitivity=%s allowlist=%d blocklist=%d domains=%d (was: sensitivity=%s allowlist=%d blocklist=%d domains=%d)",
+		cfg.Sensitivity, len(cfg.Allowlist), len(cfg.Blocklist), len(cfg.Domains),
+		old.Sensitivity, len(old.Allowlist), len(old.Blocklist), len(old.Domains),
+	)
+}
+
+// getConfig returns the current config under a read lock. Callers should
+// capture the returned pointer into a local variable and use that for the
+// duration of the request to get a consistent snapshot.
+func (s *Server) getConfig() *config.Config {
+	s.mu.RLock()
+	cfg := s.config
+	s.mu.RUnlock()
+	return cfg
 }
 
 // registerTools adds the webguard_fetch and webguard_status tools.
@@ -90,6 +116,9 @@ func (s *Server) handleFetch(
 ) (*mcp.CallToolResult, error) {
 	totalStart := time.Now()
 
+	// Grab a consistent config snapshot for this request.
+	cfg := s.getConfig()
+
 	// --- Parse arguments ---
 	rawURL, err := request.RequireString("url")
 	if err != nil {
@@ -107,7 +136,7 @@ func (s *Server) handleFetch(
 	domain := strings.ToLower(parsed.Hostname())
 
 	// --- Check blocklist ---
-	if s.config.IsBlocked(domain) {
+	if cfg.IsBlocked(domain) {
 		s.logAuditEntry(rawURL, "block", 0, nil, 0, 0, 0, "domain is blocklisted")
 		return mcp.NewToolResultText(
 			fmt.Sprintf("[BLOCKED: domain %q is on the blocklist]", domain),
@@ -115,7 +144,7 @@ func (s *Server) handleFetch(
 	}
 
 	// --- Check allowlist ---
-	if !s.config.IsAllowed(domain) {
+	if !cfg.IsAllowed(domain) {
 		s.logAuditEntry(rawURL, "block", 0, nil, 0, 0, 0, "domain not on allowlist")
 		return mcp.NewToolResultText(
 			fmt.Sprintf("[BLOCKED: domain %q is not on the allowlist]", domain),
@@ -124,8 +153,8 @@ func (s *Server) handleFetch(
 
 	// --- Build fetch options ---
 	opts := fetch.FetchOptions{
-		MaxBodySize: s.config.MaxBodySize,
-		Timeout:     s.config.Timeout.Duration,
+		MaxBodySize: cfg.MaxBodySize,
+		Timeout:     cfg.Timeout.Duration,
 	}
 
 	if len(customHeaders) > 0 {
@@ -161,7 +190,7 @@ func (s *Server) handleFetch(
 	}
 
 	// --- Classify ---
-	sensitivity := classify.Sensitivity(s.config.SensitivityForDomain(domain))
+	sensitivity := classify.Sensitivity(cfg.SensitivityForDomain(domain))
 	engine := classify.NewEngine(sensitivity)
 
 	scanStart := time.Now()
@@ -217,10 +246,12 @@ func (s *Server) handleStatus(
 	_ context.Context,
 	_ mcp.CallToolRequest,
 ) (*mcp.CallToolResult, error) {
-	// Build a classifier just to read pattern count.
-	engine := classify.NewEngine(classify.Sensitivity(s.config.Sensitivity))
+	cfg := s.getConfig()
 
-	auditPath := s.config.Audit.Path
+	// Build a classifier just to read pattern count.
+	engine := classify.NewEngine(classify.Sensitivity(cfg.Sensitivity))
+
+	auditPath := cfg.Audit.Path
 	if auditPath == "" {
 		auditPath = audit.DefaultPath()
 	}
@@ -237,14 +268,14 @@ func (s *Server) handleStatus(
 			"  domains:      %d overrides\n"+
 			"  audit:        enabled=%v path=%s",
 		s.version,
-		s.config.Sensitivity,
+		cfg.Sensitivity,
 		engine.PatternCount(),
-		s.config.MaxBodySize,
-		s.config.Timeout.Duration,
-		len(s.config.Allowlist),
-		len(s.config.Blocklist),
-		len(s.config.Domains),
-		s.config.Audit.Enabled,
+		cfg.MaxBodySize,
+		cfg.Timeout.Duration,
+		len(cfg.Allowlist),
+		len(cfg.Blocklist),
+		len(cfg.Domains),
+		cfg.Audit.Enabled,
 		auditPath,
 	)
 

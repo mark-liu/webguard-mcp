@@ -1,0 +1,56 @@
+version: 2
+
+project_name: webguard-mcp
+
+before:
+  hooks:
+    - go mod tidy
+    - go test ./...
+
+builds:
+  - id: webguard-mcp
+    main: ./cmd/webguard-mcp
+    binary: webguard-mcp
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - darwin
+    goarch:
+      - amd64
+      - arm64
+    ldflags:
+      - -s -w -X main.version={{.Version}}
+
+archives:
+  - id: default
+    formats:
+      - tar.gz
+    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+
+checksum:
+  name_template: "checksums.txt"
+  algorithm: sha256
+
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - "^docs:"
+      - "^test:"
+      - "^Merge"
+
+brews:
+  - name: webguard-mcp
+    repository:
+      owner: mark-liu
+      name: homebrew-tap
+      token: "{{ .Env.HOMEBREW_TAP_TOKEN }}"
+    directory: Formula
+    homepage: "https://github.com/mark-liu/webguard-mcp"
+    description: "Secure web fetching MCP server for LLM agents — local prompt injection scanning"
+    license: "MIT"
+    install: |
+      bin.install "webguard-mcp"
+    test: |
+      assert_match "webguard-mcp", shell_output("#{bin}/webguard-mcp --version")
