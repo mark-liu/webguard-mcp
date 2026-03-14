@@ -1,6 +1,6 @@
 .PHONY: build test bench clean lint release
 
-VERSION ?= 0.1.2
+VERSION ?= 0.2.0
 LDFLAGS := -ldflags "-X main.version=$(VERSION)"
 
 build:
