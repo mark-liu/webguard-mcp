@@ -196,5 +196,12 @@ func ResolveAndValidate(host string) (net.IP, error) {
 		}
 	}
 
+	// Prefer IPv4 addresses — many networks have broken or slow IPv6, and the
+	// pinned dialer bypasses Go's happy-eyeballs fallback.
+	for _, ip := range ips {
+		if ip.To4() != nil {
+			return ip, nil
+		}
+	}
 	return ips[0], nil
 }
