@@ -1,28 +1,3 @@
----
-id: webguard-mcp
-name: WebGuard MCP
-version: 0.1.0
-description: Secure web fetching for LLM agents — prompt injection scanning before content enters context
-license: MIT
-language: go
-transport: stdio
-tools:
-  - name: webguard_fetch
-    description: Fetch URL with prompt injection scanning
-  - name: webguard_status
-    description: Server health and config status
-inspired_by:
-  - name: Agent Wall
-    url: https://github.com/agent-wall/agent-wall
-    license: MIT
-  - name: MCP Guard
-    url: https://github.com/General-Analysis/mcp-guard
-    license: MIT
-  - name: Lasso claude-hooks
-    url: https://github.com/lasso-security/claude-hooks
-    license: MIT
----
-
 # WebGuard MCP
 
 Secure web fetching MCP server for LLM agents. Scans fetched content for prompt injection attacks **before** it enters the LLM context window. Malicious content is blocked entirely — zero leaked tokens.
