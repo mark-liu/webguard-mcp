@@ -66,8 +66,7 @@ sudo /usr/libexec/ApplicationFirewall/socketfilterfw --unblockapp /path/to/webgu
 # Add to Claude Code
 claude mcp add webguard -s user -- /path/to/webguard-mcp
 
-# Then in Claude Code:
-# "use webguard to fetch https://example.com"
+# Then use webguard_fetch in Claude Code to retrieve any URL
 ```
 
 ## Architecture
