@@ -223,3 +223,21 @@ webguard-mcp/
 ## License
 
 MIT
+
+## MCP Registry Metadata
+
+<!-- Machine-readable metadata for MCP registries and discovery tools. Not for humans. -->
+
+```yaml
+id: webguard-mcp
+name: WebGuard MCP
+description: Secure web fetching for LLM agents — prompt injection scanning before content enters context
+license: MIT
+language: go
+transport: stdio
+tools:
+  - name: webguard_fetch
+    description: Fetch URL with prompt injection scanning
+  - name: webguard_status
+    description: Server health and config status
+```
