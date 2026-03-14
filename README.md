@@ -213,21 +213,6 @@ make bench-real     # Fetch real URLs and measure overhead
 make lint           # go vet + staticcheck
 ```
 
-### Releasing
-
-Tags trigger the GitHub Actions release pipeline which cross-compiles for linux/darwin (amd64/arm64), uploads binaries + checksums, and auto-pushes the Homebrew formula to `mark-liu/homebrew-tap`.
-
-```bash
-# Update VERSION in Makefile, then:
-make release VERSION=X.Y.Z
-```
-
-Or push a tag to trigger the CI pipeline:
-
-```bash
-git tag -a vX.Y.Z -m "vX.Y.Z: description"
-git push origin vX.Y.Z
-```
 
 ## Project Structure
 
