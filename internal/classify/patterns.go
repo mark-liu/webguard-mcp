@@ -84,7 +84,7 @@ func allPatterns() []Pattern {
 		// exfil-instruction (5)
 		p("ei-001", "exfil-instruction", SeverityCritical, PatternLiteral, "send all data to"),
 		p("ei-002", "exfil-instruction", SeverityHigh, PatternLiteral, "exfiltrate"),
-		p("ei-003", "exfil-instruction", SeverityCritical, PatternRegex, `(?i)send\s+(all|the|this|your)\s+(data|information|context|conversation)\s+to\s+`),
+		p("ei-003", "exfil-instruction", SeverityCritical, PatternRegex, `(?i)send\s+(all|the|this|your)\s+(the\s+)?(data|information|context|conversation)\s+(and\s+\w+\s+)?to\s+(https?://|//|[a-z0-9.-]+\.[a-z]{2,})`),
 		p("ei-004", "exfil-instruction", SeverityHigh, PatternRegex, `(?i)(fetch|load|visit|open|navigate)\s+(https?://|//)[^\s]+`),
 		p("ei-005", "exfil-instruction", SeverityHigh, PatternRegex, `!\[[^\]]*\]\(https?://[^\)]+\)`),
 

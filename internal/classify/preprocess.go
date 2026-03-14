@@ -9,9 +9,10 @@ import (
 	"golang.org/x/text/unicode/norm"
 )
 
-// PreprocessResult holds the output of the 7-step preprocessing pipeline.
+// PreprocessResult holds the output of the preprocessing pipeline.
 type PreprocessResult struct {
 	CleanText      string        `json:"clean_text"`
+	RawText        string        `json:"-"` // pre-HTML-strip text for raw pattern scanning
 	HTMLComments   []string      `json:"html_comments,omitempty"`
 	DecodedBlobs   []EncodedBlob `json:"decoded_blobs,omitempty"`
 	ZeroWidthCount int           `json:"zero_width_count"`
@@ -28,41 +29,47 @@ var zeroWidthChars = map[rune]bool{
 	'\uFEFF': true, // byte order mark / zero-width no-break space
 }
 
-// Preprocess runs a 7-step pipeline to normalise raw content into a form
+// Preprocess runs an 8-step pipeline to normalise raw content into a form
 // suitable for pattern matching:
-//  1. Extract HTML comments
-//  2. Strip HTML tags
-//  3. Decode HTML entities
-//  4. Detect and decode base64 blobs
-//  5. URL-decode %XX sequences
-//  6. Unicode NFC normalise
-//  7. Detect, count, and strip zero-width characters
+//  1. Preserve raw text (pre-HTML-strip) for pattern scanning
+//  2. Extract HTML comments
+//  3. Strip HTML tags
+//  4. Decode HTML entities
+//  5. Detect and decode base64 blobs
+//  6. URL-decode %XX sequences
+//  7. Unicode NFC normalise
+//  8. Detect, count, and strip zero-width characters
 func Preprocess(raw string) PreprocessResult {
 	var result PreprocessResult
 
-	// Step 1: Extract HTML comments before stripping tags.
+	// Step 1: Preserve raw text before HTML stripping. Patterns like <<SYS>>
+	// are destroyed by the HTML tokenizer (angle brackets parsed as tags), so
+	// we keep the raw form for a separate scan pass.
+	result.RawText = raw
+
+	// Step 2: Extract HTML comments before stripping tags.
 	commentMatches := htmlCommentRE.FindAllStringSubmatch(raw, -1)
 	for _, m := range commentMatches {
 		result.HTMLComments = append(result.HTMLComments, strings.TrimSpace(m[1]))
 	}
 	text := htmlCommentRE.ReplaceAllString(raw, " ")
 
-	// Step 2: Strip HTML tags using the html tokenizer.
+	// Step 3: Strip HTML tags using the html tokenizer.
 	text = stripHTMLTags(text)
 
-	// Step 3: Decode HTML entities.
+	// Step 4: Decode HTML entities.
 	text = html.UnescapeString(text)
 
-	// Step 4: Detect and decode base64 blobs.
+	// Step 5: Detect and decode base64 blobs.
 	result.DecodedBlobs = DetectBase64(text)
 
-	// Step 5: URL-decode percent-encoded sequences.
+	// Step 6: URL-decode percent-encoded sequences.
 	text = DecodeURLEncoded(text)
 
-	// Step 6: Unicode NFC normalisation.
+	// Step 7: Unicode NFC normalisation.
 	text = norm.NFC.String(text)
 
-	// Step 7: Detect, count, and strip zero-width characters.
+	// Step 8: Detect, count, and strip zero-width characters.
 	result.ZeroWidthCount = countZeroWidth(text)
 	text = stripZeroWidth(text)
 

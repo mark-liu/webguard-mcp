@@ -47,17 +47,12 @@ func TestMaliciousPayloads(t *testing.T) {
 	engine := NewEngine(SensitivityMedium)
 	root := testdataDir(t)
 
-	// Known gaps: these testdata payloads exercise attack vectors that the
-	// current pattern set does not catch or that get neutralised during
-	// preprocessing (HTML tag stripping destroys <<SYS>> markers, regex
-	// doesn't cover the "send all the information" word ordering, and
-	// zero-width/RTL chars are stripped before pattern matching so the
-	// remaining text is benign).
+	// Known gaps: these testdata payloads exercise attack vectors where
+	// zero-width/RTL chars are stripped before pattern matching and the
+	// remaining text is benign — no pattern can match.
 	knownGaps := map[string]bool{
-		"send info variant":        true, // regex ei-003 word order mismatch
-		"Llama system tags":        true, // <<SYS>> destroyed by HTML tokenizer
-		"zero-width space hiding":  true, // ZWS stripped; remaining text benign
-		"RTL override filename":    true, // RTL chars stripped; remaining text benign
+		"zero-width space hiding": true, // ZWS stripped; remaining text benign
+		"RTL override filename":   true, // RTL chars stripped; remaining text benign
 	}
 
 	files, err := filepath.Glob(filepath.Join(root, "malicious", "*.json"))
@@ -91,14 +86,6 @@ func TestBenignContent(t *testing.T) {
 	engine := NewEngine(SensitivityMedium)
 	root := testdataDir(t)
 
-	// Known false positives: these benign testdata entries trigger the
-	// classifier because their phrasing overlaps with attack patterns.
-	// "Send the data to the API endpoint" matches ei-003 (critical)
-	// because the regex captures "Send the data to".
-	knownFalsePositives := map[string]bool{
-		"API docs with send data": true,
-	}
-
 	files, err := filepath.Glob(filepath.Join(root, "benign", "*.json"))
 	if err != nil {
 		t.Fatalf("failed to glob benign files: %v", err)
@@ -115,9 +102,6 @@ func TestBenignContent(t *testing.T) {
 			t.Run(category+"/"+p.Description, func(t *testing.T) {
 				result := engine.Classify(p.Content)
 				if result.Verdict != VerdictPass {
-					if knownFalsePositives[p.Description] {
-						t.Skipf("known false positive: %s (score=%.4f)", p.Description, result.Score)
-					}
 					t.Errorf("false positive: expected pass, got %s (score=%.4f, matches=%d)\ncontent: %s",
 						result.Verdict, result.Score, len(result.Matches), p.Content)
 					for _, m := range result.Matches {

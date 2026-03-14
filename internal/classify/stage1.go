@@ -7,12 +7,21 @@ import (
 
 // ScanStage1 runs fast pattern matching against preprocessed content. It
 // applies the Aho-Corasick automaton for literal patterns and compiled
-// regexes, scanning clean text, HTML comments, and decoded blobs.
-func (e *Engine) ScanStage1(text string, comments []string, decoded []EncodedBlob) []Match {
+// regexes, scanning clean text, raw text (pre-HTML-strip), HTML comments,
+// and decoded blobs.
+func (e *Engine) ScanStage1(text string, rawText string, comments []string, decoded []EncodedBlob) []Match {
 	var matches []Match
 
-	// Scan main text.
+	// Scan main (cleaned) text.
 	matches = append(matches, e.scanText(text, false)...)
+
+	// Scan raw text (pre-HTML-strip) for patterns that HTML stripping
+	// destroys, e.g. <<SYS>>, <|im_start|>. Only adds new matches not
+	// already found in cleaned text.
+	if rawText != text {
+		rawMatches := e.scanText(rawText, false)
+		matches = append(matches, rawMatches...)
+	}
 
 	// Scan each HTML comment.
 	for _, comment := range comments {

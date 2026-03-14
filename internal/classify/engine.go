@@ -63,8 +63,8 @@ func (e *Engine) Classify(content string) Result {
 	// Step 1: Preprocess.
 	pp := Preprocess(content)
 
-	// Step 2: Stage 1 scanning.
-	matches := e.ScanStage1(pp.CleanText, pp.HTMLComments, pp.DecodedBlobs)
+	// Step 2: Stage 1 scanning (clean text + raw text + comments + decoded).
+	matches := e.ScanStage1(pp.CleanText, pp.RawText, pp.HTMLComments, pp.DecodedBlobs)
 	elapsed := time.Since(start)
 
 	// Step 3: Zero matches — clean content.
@@ -83,7 +83,7 @@ func (e *Engine) Classify(content string) Result {
 			elapsed = time.Since(start)
 			return Result{
 				Verdict:  VerdictBlock,
-				Score:    e.ScoreStage2(matches, len(pp.CleanText), len(pp.DecodedBlobs) > 0),
+				Score:    e.ScoreStage2(matches, len(pp.CleanText), len(pp.DecodedBlobs) > 0, pp.ZeroWidthCount),
 				Matches:  matches,
 				Stage:    1,
 				TimingMS: float64(elapsed.Microseconds()) / 1000.0,
@@ -93,7 +93,7 @@ func (e *Engine) Classify(content string) Result {
 
 	// Step 5: Stage 2 scoring.
 	hasEncoded := len(pp.DecodedBlobs) > 0
-	score := e.ScoreStage2(matches, len(pp.CleanText), hasEncoded)
+	score := e.ScoreStage2(matches, len(pp.CleanText), hasEncoded, pp.ZeroWidthCount)
 	elapsed = time.Since(start)
 
 	// Step 6: Threshold verdict.

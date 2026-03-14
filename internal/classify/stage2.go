@@ -4,8 +4,9 @@ import "math"
 
 // ScoreStage2 computes a heuristic threat score from Stage 1 matches. The
 // score accounts for pattern severity weights, match density, spatial
-// clustering, encoding presence, and dangerous category proximity.
-func (e *Engine) ScoreStage2(matches []Match, textLen int, hasEncoded bool) float64 {
+// clustering, encoding presence, zero-width char count, and dangerous
+// category proximity.
+func (e *Engine) ScoreStage2(matches []Match, textLen int, hasEncoded bool, zeroWidthCount int) float64 {
 	if len(matches) == 0 {
 		return 0
 	}
@@ -39,6 +40,14 @@ func (e *Engine) ScoreStage2(matches []Match, textLen int, hasEncoded bool) floa
 	// Encoding penalty: content contained encoded payloads.
 	if hasEncoded {
 		total *= 1.3
+	}
+
+	// Zero-width char penalty: high counts suggest obfuscation attempts.
+	// 3+ zero-width chars boost score by 1.2x; 10+ by 1.5x.
+	if zeroWidthCount >= 10 {
+		total *= 1.5
+	} else if zeroWidthCount >= 3 {
+		total *= 1.2
 	}
 
 	// Round to 4 decimal places.
