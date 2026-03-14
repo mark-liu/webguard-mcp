@@ -1,5 +1,5 @@
-webguard-mcp
-benchmark
+/webguard-mcp
+/benchmark
 dist/
 *.exe
 *.test
