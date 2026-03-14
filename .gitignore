@@ -1,0 +1,6 @@
+webguard-mcp
+benchmark
+*.exe
+*.test
+*.out
+.DS_Store
