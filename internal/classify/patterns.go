@@ -96,8 +96,8 @@ func allPatterns() []Pattern {
 
 		// unicode-obfuscation (4)
 		p("uo-001", "unicode-obfuscation", SeverityHigh, PatternRegex, `[\x{200B}\x{200C}\x{200D}\x{FEFF}]{3,}`),
-		p("uo-002", "unicode-obfuscation", SeverityMedium, PatternRegex, `[\x{202A}-\x{202E}\x{2066}-\x{2069}]`),
-		p("uo-003", "unicode-obfuscation", SeverityMedium, PatternRegex, `[\x{E000}-\x{F8FF}]`),
+		p("uo-002", "unicode-obfuscation", SeverityMedium, PatternRegex, `[\x{202A}-\x{202E}\x{2066}-\x{2069}]{2,}`),
+		p("uo-003", "unicode-obfuscation", SeverityMedium, PatternRegex, `[\x{E000}-\x{F8FF}]{2,}`),
 		p("uo-004", "unicode-obfuscation", SeverityHigh, PatternRegex, `[\x{E0001}-\x{E007F}]`),
 
 		// encoded-injection (3)
