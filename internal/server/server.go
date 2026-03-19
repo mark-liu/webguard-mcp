@@ -94,6 +94,9 @@ func (s *Server) registerTools() {
 			mcp.WithBoolean("raw",
 				mcp.Description("If true, return raw HTML instead of converted markdown"),
 			),
+			mcp.WithNumber("max_chars",
+				mcp.Description("Maximum characters to return (0 = unlimited). Content is truncated with a marker if exceeded."),
+			),
 		),
 		s.handleFetch,
 	)
@@ -127,6 +130,7 @@ func (s *Server) handleFetch(
 
 	customHeaders := mcp.ParseStringMap(request, "headers", nil)
 	raw := mcp.ParseBoolean(request, "raw", false)
+	maxChars := mcp.ParseInt(request, "max_chars", 0)
 
 	// --- Extract domain for config lookups ---
 	parsed, err := url.Parse(rawURL)
@@ -232,11 +236,23 @@ func (s *Server) handleFetch(
 		return mcp.NewToolResultText(blockMsg), nil
 	}
 
+	// --- Truncate if max_chars set ---
+	truncated := false
+	originalLen := len(content)
+	if maxChars > 0 && originalLen > maxChars {
+		content = content[:maxChars] + fmt.Sprintf("\n\n[... truncated at %d chars (%d total) ...]", maxChars, originalLen)
+		truncated = true
+	}
+
 	// --- Pass: return content + metadata ---
 	s.logAuditEntry(
 		rawURL, "pass", classification.Score, matchSummaries,
 		fetchElapsed, scanElapsed, totalElapsed, "",
 	)
+
+	if truncated {
+		meta += fmt.Sprintf("\n  truncated: true\n  original_chars: %d", originalLen)
+	}
 
 	return mcp.NewToolResultText(content + "\n" + meta), nil
 }

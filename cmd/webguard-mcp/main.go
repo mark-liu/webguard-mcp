@@ -13,7 +13,7 @@ import (
 	"github.com/mark-liu/webguard-mcp/internal/server"
 )
 
-var version = "0.1.0"
+var version = "0.4.0"
 
 func main() {
 	configPath := flag.String("config", "", "path to config file (default: ~/.config/webguard-mcp/config.yaml)")
