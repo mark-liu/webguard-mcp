@@ -25,6 +25,12 @@ func TestDefault(t *testing.T) {
 	if cfg.Audit.Path != "" {
 		t.Errorf("Audit.Path = %q, want empty", cfg.Audit.Path)
 	}
+	if cfg.Mode != "" {
+		t.Errorf("Mode = %q, want empty (defaults to block)", cfg.Mode)
+	}
+	if cfg.PatternsDir != "" {
+		t.Errorf("PatternsDir = %q, want empty", cfg.PatternsDir)
+	}
 }
 
 func TestLoad_MissingFile(t *testing.T) {
@@ -44,9 +50,13 @@ func TestLoad_ValidFile(t *testing.T) {
 sensitivity: high
 max_body_size: 1048576
 request_timeout: "30s"
+mode: warn
+patterns_dir: /tmp/patterns.d
 domains:
   "example.com":
     sensitivity: low
+    suppress: ["exfil-instruction", "unicode-obfuscation"]
+    timeout: "30s"
   "*.evil.com":
     sensitivity: critical
 allowlist:
@@ -76,11 +86,29 @@ audit:
 	if cfg.Timeout.Duration != 30*time.Second {
 		t.Errorf("Timeout = %v, want %v", cfg.Timeout.Duration, 30*time.Second)
 	}
+	if cfg.Mode != "warn" {
+		t.Errorf("Mode = %q, want %q", cfg.Mode, "warn")
+	}
+	if cfg.PatternsDir != "/tmp/patterns.d" {
+		t.Errorf("PatternsDir = %q, want %q", cfg.PatternsDir, "/tmp/patterns.d")
+	}
 	if cfg.Audit.Enabled {
 		t.Error("Audit.Enabled = true, want false")
 	}
 	if cfg.Audit.Path != "/tmp/audit.jsonl" {
 		t.Errorf("Audit.Path = %q, want %q", cfg.Audit.Path, "/tmp/audit.jsonl")
+	}
+
+	// Check domain overrides.
+	dc := cfg.Domains["example.com"]
+	if dc.Sensitivity != "low" {
+		t.Errorf("example.com sensitivity = %q, want %q", dc.Sensitivity, "low")
+	}
+	if len(dc.Suppress) != 2 {
+		t.Errorf("example.com suppress = %v, want 2 entries", dc.Suppress)
+	}
+	if dc.Timeout.Duration != 30*time.Second {
+		t.Errorf("example.com timeout = %v, want 30s", dc.Timeout.Duration)
 	}
 }
 
@@ -124,6 +152,93 @@ func TestSensitivityForDomain(t *testing.T) {
 			got := cfg.SensitivityForDomain(tc.domain)
 			if got != tc.want {
 				t.Errorf("SensitivityForDomain(%q) = %q, want %q", tc.domain, got, tc.want)
+			}
+		})
+	}
+}
+
+func TestSuppressedCategoriesForDomain(t *testing.T) {
+	cfg := Default()
+	cfg.Domains = map[string]DomainConfig{
+		"docs.example.com": {Suppress: []string{"exfil-instruction", "encoded-injection"}},
+		"*.linkedin.com":   {Suppress: []string{"authority-claim"}},
+	}
+
+	tests := []struct {
+		domain string
+		want   map[string]bool
+	}{
+		{"docs.example.com", map[string]bool{"exfil-instruction": true, "encoded-injection": true}},
+		{"www.linkedin.com", map[string]bool{"authority-claim": true}},
+		{"other.com", nil},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.domain, func(t *testing.T) {
+			got := cfg.SuppressedCategoriesForDomain(tc.domain)
+			if tc.want == nil {
+				if got != nil {
+					t.Errorf("expected nil, got %v", got)
+				}
+				return
+			}
+			if len(got) != len(tc.want) {
+				t.Errorf("got %v, want %v", got, tc.want)
+				return
+			}
+			for k := range tc.want {
+				if !got[k] {
+					t.Errorf("missing category %q in result", k)
+				}
+			}
+		})
+	}
+}
+
+func TestTimeoutForDomain(t *testing.T) {
+	cfg := Default()
+	cfg.Domains = map[string]DomainConfig{
+		"slow.com":    {Timeout: Duration{30 * time.Second}},
+		"*.docs.com":  {Timeout: Duration{45 * time.Second}},
+	}
+
+	tests := []struct {
+		domain string
+		want   time.Duration
+	}{
+		{"slow.com", 30 * time.Second},
+		{"api.docs.com", 45 * time.Second},
+		{"fast.com", 15 * time.Second}, // global default
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.domain, func(t *testing.T) {
+			got := cfg.TimeoutForDomain(tc.domain)
+			if got != tc.want {
+				t.Errorf("TimeoutForDomain(%q) = %v, want %v", tc.domain, got, tc.want)
+			}
+		})
+	}
+}
+
+func TestIsWarnMode(t *testing.T) {
+	tests := []struct {
+		mode string
+		want bool
+	}{
+		{"", false},
+		{"block", false},
+		{"warn", true},
+		{"WARN", true},
+		{"Warn", true},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.mode, func(t *testing.T) {
+			cfg := Default()
+			cfg.Mode = tc.mode
+			if got := cfg.IsWarnMode(); got != tc.want {
+				t.Errorf("IsWarnMode() = %v, want %v", got, tc.want)
 			}
 		})
 	}

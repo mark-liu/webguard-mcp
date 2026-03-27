@@ -128,10 +128,14 @@ type regexEntry struct {
 }
 
 // compilePatterns builds the Aho-Corasick automaton and compiles all regex
-// patterns. It panics on invalid regex since patterns are compile-time constants.
+// patterns using the built-in pattern set.
 func compilePatterns() *compiledPatterns {
-	defs := allPatterns()
+	return compilePatternsFrom(allPatterns())
+}
 
+// compilePatternsFrom builds the matching structures from an arbitrary pattern
+// list. This allows merging built-in and external patterns before compilation.
+func compilePatternsFrom(defs []Pattern) *compiledPatterns {
 	var literals []string
 	var litIdx []int
 

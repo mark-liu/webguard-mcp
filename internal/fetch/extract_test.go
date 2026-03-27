@@ -147,3 +147,71 @@ func TestExtract(t *testing.T) {
 		})
 	}
 }
+
+func TestExtractClean(t *testing.T) {
+	html := `<html><body>
+		<nav><a href="/">Home</a><a href="/about">About</a></nav>
+		<header><div class="logo">Site Logo</div></header>
+		<main>
+			<article>
+				<h1>Article Title</h1>
+				<p>This is the main content.</p>
+			</article>
+		</main>
+		<aside><h3>Related Posts</h3><ul><li>Post 1</li></ul></aside>
+		<footer><p>Copyright 2026</p></footer>
+	</body></html>`
+
+	// Extract (full) should include nav, header, footer, aside content.
+	full, err := Extract([]byte(html), "text/html")
+	if err != nil {
+		t.Fatalf("Extract() error: %v", err)
+	}
+
+	// ExtractClean should strip nav, header, footer, aside.
+	clean, err := ExtractClean([]byte(html), "text/html")
+	if err != nil {
+		t.Fatalf("ExtractClean() error: %v", err)
+	}
+
+	// Full should contain boilerplate content.
+	if !strings.Contains(full, "Home") {
+		t.Error("Extract() should contain nav link 'Home'")
+	}
+	if !strings.Contains(full, "Site Logo") {
+		t.Error("Extract() should contain header 'Site Logo'")
+	}
+	if !strings.Contains(full, "Copyright") {
+		t.Error("Extract() should contain footer 'Copyright'")
+	}
+	if !strings.Contains(full, "Related Posts") {
+		t.Error("Extract() should contain aside 'Related Posts'")
+	}
+
+	// Clean should NOT contain boilerplate.
+	if strings.Contains(clean, "Home") {
+		t.Error("ExtractClean() should not contain nav link 'Home'")
+	}
+	if strings.Contains(clean, "Site Logo") {
+		t.Error("ExtractClean() should not contain header 'Site Logo'")
+	}
+	if strings.Contains(clean, "Copyright") {
+		t.Error("ExtractClean() should not contain footer 'Copyright'")
+	}
+	if strings.Contains(clean, "Related Posts") {
+		t.Error("ExtractClean() should not contain aside 'Related Posts'")
+	}
+
+	// Clean MUST contain main content.
+	if !strings.Contains(clean, "Article Title") {
+		t.Error("ExtractClean() must preserve 'Article Title'")
+	}
+	if !strings.Contains(clean, "main content") {
+		t.Error("ExtractClean() must preserve 'main content'")
+	}
+
+	// Clean should be shorter than full.
+	if len(clean) >= len(full) {
+		t.Errorf("ExtractClean() (%d chars) should be shorter than Extract() (%d chars)", len(clean), len(full))
+	}
+}

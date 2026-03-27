@@ -12,6 +12,11 @@ const (
 	SensitivityHigh   Sensitivity = "high"
 )
 
+// ClassifyOptions holds optional parameters for the classification pipeline.
+type ClassifyOptions struct {
+	SuppressCategories map[string]bool // pattern categories to ignore
+}
+
 // Engine is the two-stage prompt injection classifier. It preprocesses
 // content, runs fast pattern matching (Stage 1), then applies heuristic
 // scoring (Stage 2) to produce a verdict.
@@ -21,9 +26,15 @@ type Engine struct {
 	patterns    *compiledPatterns
 }
 
-// NewEngine creates a classifier engine with the given sensitivity level.
-// Patterns are compiled once and shared for the engine's lifetime.
+// NewEngine creates a classifier engine with the given sensitivity level
+// using the built-in pattern set.
 func NewEngine(sensitivity Sensitivity) *Engine {
+	return NewEngineWithPatterns(sensitivity, nil)
+}
+
+// NewEngineWithPatterns creates a classifier engine that merges built-in
+// patterns with additional external patterns.
+func NewEngineWithPatterns(sensitivity Sensitivity, extra []Pattern) *Engine {
 	var threshold float64
 	switch sensitivity {
 	case SensitivityLow:
@@ -36,10 +47,15 @@ func NewEngine(sensitivity Sensitivity) *Engine {
 		threshold = 1.0
 	}
 
+	defs := allPatterns()
+	if len(extra) > 0 {
+		defs = append(defs, extra...)
+	}
+
 	return &Engine{
 		sensitivity: sensitivity,
 		threshold:   threshold,
-		patterns:    compilePatterns(),
+		patterns:    compilePatternsFrom(defs),
 	}
 }
 
@@ -49,15 +65,23 @@ func (e *Engine) PatternCount() int {
 }
 
 // Classify runs the full two-stage analysis pipeline on the provided content
-// and returns a classification result.
+// and returns a classification result. Equivalent to ClassifyWithOptions with
+// empty options.
+func (e *Engine) Classify(content string) Result {
+	return e.ClassifyWithOptions(content, ClassifyOptions{})
+}
+
+// ClassifyWithOptions runs the two-stage pipeline with optional parameters
+// such as category suppression.
 //
 // Flow:
 //  1. Preprocess (HTML strip, decode, normalise)
 //  2. Stage 1: fast pattern matching (Aho-Corasick + regex)
-//  3. Early exit on zero matches (pass) or critical match (block)
-//  4. Stage 2: heuristic scoring with density/clustering/proximity
-//  5. Threshold comparison for final verdict
-func (e *Engine) Classify(content string) Result {
+//  3. Filter suppressed categories
+//  4. Early exit on zero matches (pass) or critical match (block)
+//  5. Stage 2: heuristic scoring with density/clustering/proximity
+//  6. Threshold comparison for final verdict
+func (e *Engine) ClassifyWithOptions(content string, opts ClassifyOptions) Result {
 	start := time.Now()
 
 	// Step 1: Preprocess.
@@ -65,9 +89,15 @@ func (e *Engine) Classify(content string) Result {
 
 	// Step 2: Stage 1 scanning (clean text + raw text + comments + decoded).
 	matches := e.ScanStage1(pp.CleanText, pp.RawText, pp.HTMLComments, pp.DecodedBlobs)
+
+	// Step 3: Filter suppressed categories.
+	if len(opts.SuppressCategories) > 0 {
+		matches = filterSuppressed(matches, opts.SuppressCategories)
+	}
+
 	elapsed := time.Since(start)
 
-	// Step 3: Zero matches — clean content.
+	// Step 4: Zero matches — clean content.
 	if len(matches) == 0 {
 		return Result{
 			Verdict:  VerdictPass,
@@ -77,7 +107,7 @@ func (e *Engine) Classify(content string) Result {
 		}
 	}
 
-	// Step 4: Any critical severity match triggers immediate block.
+	// Step 5: Any critical severity match triggers immediate block.
 	for _, m := range matches {
 		if m.Severity == SeverityCritical {
 			elapsed = time.Since(start)
@@ -91,12 +121,12 @@ func (e *Engine) Classify(content string) Result {
 		}
 	}
 
-	// Step 5: Stage 2 scoring.
+	// Step 6: Stage 2 scoring.
 	hasEncoded := len(pp.DecodedBlobs) > 0
 	score := e.ScoreStage2(matches, len(pp.CleanText), hasEncoded, pp.ZeroWidthCount)
 	elapsed = time.Since(start)
 
-	// Step 6: Threshold verdict.
+	// Step 7: Threshold verdict.
 	verdict := VerdictPass
 	if score >= e.threshold {
 		verdict = VerdictBlock
@@ -109,4 +139,15 @@ func (e *Engine) Classify(content string) Result {
 		Stage:    2,
 		TimingMS: float64(elapsed.Microseconds()) / 1000.0,
 	}
+}
+
+// filterSuppressed removes matches whose category is in the suppress set.
+func filterSuppressed(matches []Match, suppress map[string]bool) []Match {
+	var filtered []Match
+	for _, m := range matches {
+		if !suppress[m.Category] {
+			filtered = append(filtered, m)
+		}
+	}
+	return filtered
 }

@@ -1,6 +1,7 @@
 package audit
 
 import (
+	"bufio"
 	"encoding/json"
 	"os"
 	"path/filepath"
@@ -97,4 +98,30 @@ func DefaultPath() string {
 		return "audit.jsonl"
 	}
 	return filepath.Join(home, ".local", "share", "webguard-mcp", "audit.jsonl")
+}
+
+// ReadEntries reads all audit entries from the JSONL file at path, filtered
+// to entries at or after since. If since is zero, all entries are returned.
+func ReadEntries(path string, since time.Time) ([]Entry, error) {
+	f, err := os.Open(path)
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+
+	var entries []Entry
+	scanner := bufio.NewScanner(f)
+	scanner.Buffer(make([]byte, 1<<20), 1<<20) // 1MB line buffer
+
+	for scanner.Scan() {
+		var entry Entry
+		if err := json.Unmarshal(scanner.Bytes(), &entry); err != nil {
+			continue // skip malformed lines
+		}
+		if !since.IsZero() && entry.Timestamp.Before(since) {
+			continue
+		}
+		entries = append(entries, entry)
+	}
+	return entries, scanner.Err()
 }

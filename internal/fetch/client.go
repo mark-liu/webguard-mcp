@@ -6,6 +6,7 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"strings"
 	"time"
 )
 
@@ -158,4 +159,32 @@ func Fetch(ctx context.Context, rawURL string, opts FetchOptions) (*FetchResult,
 	result.FinalURL = resp.Request.URL.String()
 
 	return result, nil
+}
+
+// FetchWithRetry wraps Fetch with a single automatic retry on timeout errors.
+// The retry uses double the original timeout.
+func FetchWithRetry(ctx context.Context, rawURL string, opts FetchOptions) (*FetchResult, error) {
+	result, err := Fetch(ctx, rawURL, opts)
+	if err == nil {
+		return result, nil
+	}
+
+	if !isTimeoutError(err) {
+		return nil, err
+	}
+
+	// Retry once with 2x timeout.
+	opts.Timeout = opts.Timeout * 2
+	return Fetch(ctx, rawURL, opts)
+}
+
+// isTimeoutError checks whether an error is a timeout-related failure.
+func isTimeoutError(err error) bool {
+	if err == nil {
+		return false
+	}
+	s := err.Error()
+	return strings.Contains(s, "context deadline exceeded") ||
+		strings.Contains(s, "TLS handshake timeout") ||
+		strings.Contains(s, "i/o timeout")
 }

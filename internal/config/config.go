@@ -12,7 +12,9 @@ import (
 
 // DomainConfig holds per-domain overrides.
 type DomainConfig struct {
-	Sensitivity string `yaml:"sensitivity"`
+	Sensitivity string   `yaml:"sensitivity"`
+	Suppress    []string `yaml:"suppress"` // pattern categories to suppress (e.g. ["exfil-instruction"])
+	Timeout     Duration `yaml:"timeout"`  // per-domain timeout override
 }
 
 // AuditConfig controls the audit logger.
@@ -26,6 +28,8 @@ type Config struct {
 	Sensitivity string                  `yaml:"sensitivity"`
 	MaxBodySize int64                   `yaml:"max_body_size"`
 	Timeout     Duration                `yaml:"request_timeout"`
+	Mode        string                  `yaml:"mode"`         // "block" (default) or "warn"
+	PatternsDir string                  `yaml:"patterns_dir"` // directory for external pattern YAML files
 	Domains     map[string]DomainConfig `yaml:"domains"`
 	Allowlist   []string                `yaml:"allowlist"`
 	Blocklist   []string                `yaml:"blocklist"`
@@ -170,4 +174,61 @@ func matchWildcard(pattern, domain string) bool {
 	}
 	suffix := strings.ToLower(pattern[1:]) // ".example.com"
 	return strings.HasSuffix(domain, suffix) && domain != suffix[1:]
+}
+
+// IsWarnMode reports whether the server mode is "warn" (return content
+// with warning banner instead of blocking).
+func (c *Config) IsWarnMode() bool {
+	return strings.EqualFold(c.Mode, "warn")
+}
+
+// SuppressedCategoriesForDomain returns the set of pattern categories to
+// suppress for the given domain. Returns nil if no suppressions are configured.
+func (c *Config) SuppressedCategoriesForDomain(domain string) map[string]bool {
+	if c.Domains == nil {
+		return nil
+	}
+	domain = strings.ToLower(domain)
+
+	if dc, ok := c.Domains[domain]; ok && len(dc.Suppress) > 0 {
+		return toSet(dc.Suppress)
+	}
+
+	for pattern, dc := range c.Domains {
+		if matchWildcard(pattern, domain) && len(dc.Suppress) > 0 {
+			return toSet(dc.Suppress)
+		}
+	}
+
+	return nil
+}
+
+// TimeoutForDomain returns the timeout for the given domain, checking
+// domain-specific overrides first. Falls back to the global timeout.
+func (c *Config) TimeoutForDomain(domain string) time.Duration {
+	if c.Domains == nil {
+		return c.Timeout.Duration
+	}
+	domain = strings.ToLower(domain)
+
+	if dc, ok := c.Domains[domain]; ok && dc.Timeout.Duration > 0 {
+		return dc.Timeout.Duration
+	}
+
+	for pattern, dc := range c.Domains {
+		if matchWildcard(pattern, domain) && dc.Timeout.Duration > 0 {
+			return dc.Timeout.Duration
+		}
+	}
+
+	return c.Timeout.Duration
+}
+
+// toSet converts a string slice into a set (map[string]bool).
+func toSet(ss []string) map[string]bool {
+	m := make(map[string]bool, len(ss))
+	for _, s := range ss {
+		m[s] = true
+	}
+	return m
 }

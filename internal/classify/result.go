@@ -6,6 +6,7 @@ type Verdict string
 const (
 	VerdictPass  Verdict = "pass"
 	VerdictBlock Verdict = "block"
+	VerdictWarn  Verdict = "warn"
 )
 
 // Severity indicates the threat level of a matched pattern.

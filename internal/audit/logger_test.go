@@ -190,6 +190,54 @@ func TestDefaultPath(t *testing.T) {
 	}
 }
 
+func TestReadEntries(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "audit.jsonl")
+	l, err := New(path, true)
+	if err != nil {
+		t.Fatalf("New: %v", err)
+	}
+
+	now := time.Now()
+	old := now.Add(-48 * time.Hour)
+
+	// Write entries with different timestamps.
+	l.Log(Entry{Timestamp: old, URL: "https://old.com", Verdict: "pass"})
+	l.Log(Entry{Timestamp: now, URL: "https://new.com", Verdict: "block", Score: 5.0,
+		Matches: []MatchSummary{{PatternID: "io-001", Category: "instruction-override", Severity: "critical"}}})
+	l.Log(Entry{Timestamp: now, URL: "https://err.com", Verdict: "error"})
+	if err := l.Close(); err != nil {
+		t.Fatalf("Close: %v", err)
+	}
+
+	t.Run("all entries", func(t *testing.T) {
+		entries, err := ReadEntries(path, time.Time{})
+		if err != nil {
+			t.Fatalf("ReadEntries: %v", err)
+		}
+		if len(entries) != 3 {
+			t.Errorf("expected 3 entries, got %d", len(entries))
+		}
+	})
+
+	t.Run("filtered by since", func(t *testing.T) {
+		since := now.Add(-1 * time.Hour)
+		entries, err := ReadEntries(path, since)
+		if err != nil {
+			t.Fatalf("ReadEntries: %v", err)
+		}
+		if len(entries) != 2 {
+			t.Errorf("expected 2 entries after since filter, got %d", len(entries))
+		}
+	})
+
+	t.Run("nonexistent file", func(t *testing.T) {
+		_, err := ReadEntries("/nonexistent/path.jsonl", time.Time{})
+		if err == nil {
+			t.Error("expected error for nonexistent file")
+		}
+	})
+}
+
 func TestLog_OmitsEmptyFields(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "audit.jsonl")
 	l, err := New(path, true)
