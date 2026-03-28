@@ -308,6 +308,11 @@ webguard-mcp/
     └── encoded/                     # Base64-encoded payloads
 ```
 
+## Related Projects
+
+- **[mcpguard](https://github.com/mark-liu/mcpguard)** — same idea, different input. WebGuard scans web content fetched via HTTP. mcpguard scans MCP tool results (Discord messages, Telegram chats, any user-generated content returned by MCP servers). If you're worried about prompt injection from chat platforms rather than web pages, use mcpguard.
+- **[snap](https://github.com/mark-liu/snap)** — MCP stdio compression proxy for Playwright snapshots. Same proxy architecture as mcpguard but focused on token savings rather than security.
+
 ## License
 
 MIT
