@@ -1,4 +1,10 @@
-# WebGuard MCP
+# WebGuard MCP (Go — superseded)
+
+> **This project has been rewritten in Rust: [webguard](https://github.com/mark-liu/webguard)**
+>
+> The Rust version has the same security model, same test suite, and same 38 built-in patterns — plus smaller binary (6MB vs 10MB), no GC pauses, streaming body reads, and per-hop redirect SSRF re-validation. Use the Rust version for new installations.
+
+---
 
 Secure web fetching MCP server for LLM agents. Scans fetched content for prompt injection attacks **before** it enters the LLM context window. Malicious content is blocked entirely — zero leaked tokens.
 
@@ -310,6 +316,7 @@ webguard-mcp/
 
 ## Related Projects
 
+- **[webguard (Rust)](https://github.com/mark-liu/webguard)** — Rust rewrite of this project. Smaller binary, no GC, streaming body reads, per-hop redirect SSRF validation. Use this for new installations.
 - **[mcpguard](https://github.com/mark-liu/mcpguard)** — same idea, different input. WebGuard scans web content fetched via HTTP. mcpguard scans MCP tool results (Discord messages, Telegram chats, any user-generated content returned by MCP servers). If you're worried about prompt injection from chat platforms rather than web pages, use mcpguard.
 - **[snap](https://github.com/mark-liu/snap)** — MCP stdio compression proxy for Playwright snapshots. Same proxy architecture as mcpguard but focused on token savings rather than security.
 
